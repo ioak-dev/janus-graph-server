@@ -10,8 +10,13 @@ import { initializeSequences } from "./startup";
 const express = require("express");
 const cors = require("cors");
 
+const gqlScalarSchema = require("./modules/gql-scalar");
 const sessionSchema = require("./modules/session");
 const userSchema = require("./modules/user");
+const schemaSchema = require("./modules/schema");
+const schemaTableSchema = require("./modules/schema/table");
+const schemaTableDataSchema = require("./modules/schema/table/data");
+const schemaTableColumnSchema = require("./modules/schema/table/column");
 
 const databaseUri = process.env.MONGODB_URI || "mongodb://localhost:27017";
 mongoose.connect(databaseUri, {
@@ -23,8 +28,24 @@ mongoose.pluralize(undefined);
 const app = express();
 
 const server = new ApolloServer({
-  typeDefs: [sessionSchema.typeDefs, userSchema.typeDefs],
-  resolvers: [sessionSchema.resolvers, userSchema.resolvers],
+  typeDefs: [
+    gqlScalarSchema.typeDefs,
+    sessionSchema.typeDefs,
+    userSchema.typeDefs,
+    schemaSchema.typeDefs,
+    schemaTableSchema.typeDefs,
+    schemaTableColumnSchema.typeDefs,
+    schemaTableDataSchema.typeDefs,
+  ],
+  resolvers: [
+    gqlScalarSchema.resolvers,
+    sessionSchema.resolvers,
+    userSchema.resolvers,
+    schemaSchema.resolvers,
+    schemaTableSchema.resolvers,
+    schemaTableColumnSchema.resolvers,
+    schemaTableDataSchema.resolvers,
+  ],
   context: ({ req, res }: any) => {
     const authString = req.headers.authorization || "";
     const authParts = authString.split(" ");
