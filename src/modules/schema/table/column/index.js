@@ -3,6 +3,10 @@ const {
   schemaTableColumnSchema,
   schemaTableColumnCollection,
 } = require("./model");
+const {
+  schemaTableDataSchema,
+  schemaTableDataCollection,
+} = require("../data/model");
 const { getCollection } = require("../../../../lib/dbutils");
 
 const typeDefs = gql`
@@ -12,8 +16,9 @@ const typeDefs = gql`
   }
 
   extend type Mutation {
-    addSchemaTableColumn(payload: SchemaTableColumnPayload): SchemaTableColumn
-    deleteSchemaTableColumn(id: ID!): SchemaTableColumn
+    updateSchemaTableColumn(
+      payload: [SchemaTableColumnPayload]
+    ): [SchemaTableColumn]
   }
 
   input SchemaTableColumnPayload {
@@ -62,7 +67,7 @@ const resolvers = {
   },
 
   Mutation: {
-    addSchemaTableColumn: async (_, args, { space, user }) => {
+    updateSchemaTableColumn: async (_, args, { space, user }) => {
       if (!space || !user) {
         return new AuthenticationError("Not authorized to access this content");
       }
@@ -71,34 +76,53 @@ const resolvers = {
         schemaTableColumnCollection,
         schemaTableColumnSchema
       );
-      let response;
-
-      if (args.payload.id) {
-        existingData = await model.findById(args.payload.id);
-        response = await model.findByIdAndUpdate(
-          args.payload.id,
-          args.payload,
-          { new: true }
-        );
-      } else {
-        const data = new model(args.payload);
-        response = await data.save();
-      }
-      return response;
-    },
-    deleteSchemaTableColumn: async (_, { id }, { space, user }) => {
-      if (!space || !user) {
-        return new AuthenticationError("Not authorized to access this content");
-      }
-      const model = getCollection(
+      const dataModel = getCollection(
         space,
-        schemaTableColumnCollection,
-        schemaTableColumnSchema
+        schemaTableDataCollection,
+        schemaTableDataSchema
+      );
+      const responses = [];
+
+      // Remove deleted columns
+      const validIdList = args.payload
+        .map((item) => item.id)
+        .filter((item) => item);
+      const deleteResult = await model.find({ _id: { $nin: validIdList } });
+      await model.deleteMany({
+        $and: [
+          { _id: { $nin: validIdList } },
+          { tableId: args.payload[0].tableId },
+        ],
+      });
+      const deletedIdList = deleteResult.map((item) => item.id);
+
+      // Remove data stored against deleted columns
+      const updateObject = {};
+      deletedIdList.forEach((item) => (updateObject[`row.${item}`] = 1));
+      const updateResult = await dataModel.updateMany(
+        {
+          tableId: args.payload[0].tableId,
+        },
+        { $unset: updateObject },
+        { multi: true, upsert: true }
       );
 
-      const res = await model.findByIdAndDelete(id);
+      // Insert or update valid columns list
+      for (let payload of args.payload) {
+        if (payload.id) {
+          existingData = await model.findById(payload.id);
+          const response = await model.findByIdAndUpdate(payload.id, payload, {
+            new: true,
+          });
+          responses.push(response);
+        } else {
+          const data = new model(payload);
+          const response = await data.save();
+          responses.push(response);
+        }
+      }
 
-      return res;
+      return responses;
     },
   },
 };

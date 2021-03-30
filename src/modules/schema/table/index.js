@@ -7,6 +7,7 @@ const typeDefs = gql`
   extend type Query {
     schemaTableById(id: ID!): SchemaTable
     allSchemaTable: [SchemaTable]
+    allSchemaTableBySchemaId(schemaId: ID!): [SchemaTable]
     searchSchemaTable(text: String): [SchemaTable]
   }
 
@@ -60,6 +61,18 @@ const resolvers = {
         schemaTableSchema
       );
       const response = await model.find();
+      return response;
+    },
+    allSchemaTableBySchemaId: async (_, { schemaId }, { space, user }) => {
+      if (!space || !user) {
+        return new AuthenticationError("Not authorized to access this content");
+      }
+      const model = getCollection(
+        space,
+        schemaTableCollection,
+        schemaTableSchema
+      );
+      const response = await model.find({ schemaId });
       return response;
     },
     searchSchemaTable: async (_, { text }, { space, user }) => {
