@@ -5,7 +5,7 @@ const { getCollection } = require("../../lib/dbutils");
 
 const typeDefs = gql`
   type Query {
-    users: [User]!
+    user: [User]
   }
 
   type Mutation {
@@ -29,7 +29,7 @@ const typeDefs = gql`
 
 const resolvers = {
   Query: {
-    users: async (_: any, { email }: any, { space, user }: any) => {
+    user: async (_: any, { email }: any, { space, user }: any) => {
       if (!space || !user) {
         return new AuthenticationError("Not authorized to access this content");
       }

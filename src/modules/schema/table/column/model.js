@@ -8,7 +8,7 @@ const schemaTableColumnSchema = new Schema(
     datatype: { type: String },
     meta: { type: Object },
   },
-  { timestamps: true }
+  { timestamps: true, minimize: false }
 );
 
 const schemaTableColumnCollection = "schema.table.column";

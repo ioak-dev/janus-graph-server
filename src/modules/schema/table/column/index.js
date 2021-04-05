@@ -3,6 +3,7 @@ const {
   schemaTableColumnSchema,
   schemaTableColumnCollection,
 } = require("./model");
+const { schemaTableSchema, schemaTableCollection } = require("../model");
 const {
   schemaTableDataSchema,
   schemaTableDataCollection,
@@ -13,6 +14,7 @@ const typeDefs = gql`
   extend type Query {
     schemaTableColumnById(id: ID!): SchemaTableColumn
     allSchemaTableColumn(tableId: ID!): [SchemaTableColumn]
+    allSchemaTableColumnBySchemaId(schemaId: ID!): [SchemaTableColumn]
   }
 
   extend type Mutation {
@@ -62,6 +64,31 @@ const resolvers = {
         schemaTableColumnSchema
       );
       const response = await model.find({ tableId });
+      return response;
+    },
+    allSchemaTableColumnBySchemaId: async (
+      _,
+      { schemaId },
+      { space, user }
+    ) => {
+      if (!space || !user) {
+        return new AuthenticationError("Not authorized to access this content");
+      }
+      const schemaTableModel = getCollection(
+        space,
+        schemaTableCollection,
+        schemaTableSchema
+      );
+      const schemaTableResponse = await schemaTableModel.find({ schemaId });
+
+      const tableIdList = schemaTableResponse.map((item) => item.id);
+
+      const model = getCollection(
+        space,
+        schemaTableColumnCollection,
+        schemaTableColumnSchema
+      );
+      const response = await model.find({ tableId: { $in: tableIdList } });
       return response;
     },
   },
