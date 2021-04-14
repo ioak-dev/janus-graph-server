@@ -1,9 +1,9 @@
-var mongoose = require('mongoose');
+var mongoose = require("mongoose");
 
 const Schema = mongoose.Schema;
 const sequenceSchema = new Schema(
   {
-    field: { type: String },
+    name: { type: String },
     context: { type: String },
     nextval: { type: Number },
     factor: { type: Number },
@@ -11,6 +11,6 @@ const sequenceSchema = new Schema(
   { timestamps: true }
 );
 
-const sequenceCollection = 'sequence';
+const sequenceCollection = "sequence";
 
 module.exports = { sequenceSchema, sequenceCollection };

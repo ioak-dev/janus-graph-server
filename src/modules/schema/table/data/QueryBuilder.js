@@ -1,3 +1,46 @@
+export const buildQuickFilterCondition = (filterInstance, columnList) => {
+  const columnMap = {};
+  columnList.forEach((item) => {
+    columnMap[item.id] = item;
+  });
+  const condition = [];
+  Object.keys(filterInstance).forEach((columnId) => {
+    if (
+      filterInstance[columnId] &&
+      (!Array.isArray(filterInstance[columnId]) ||
+        filterInstance[columnId].length > 0)
+    ) {
+      switch (columnMap[columnId].datatype) {
+        case "list":
+        case "relation":
+          condition.push({
+            [`row.${columnId}`]: { $in: filterInstance[columnId] },
+          });
+          break;
+        case "text":
+        case "computed":
+          condition.push({
+            [`row.${columnId}`]: {
+              $regex: filterInstance[columnId],
+              $options: "i",
+            },
+          });
+          break;
+        default:
+          condition.push({
+            [`row.${columnId}`]: filterInstance[columnId],
+          });
+      }
+    }
+  });
+  if (condition.length === 0) {
+    return {};
+  }
+  return {
+    $and: condition,
+  };
+};
+
 export const buildFilterCondition = (
   filterId,
   anonymousFilter,
@@ -43,6 +86,7 @@ export const _buildFilterCondition = (filterInstance, columnMap, filterMap) => {
           });
           break;
         case "text":
+        case "computed":
           condition.push({
             [`row.${filter.id}`]: {
               $regex: new RegExp("^" + filter.value.toLowerCase(), "i"),

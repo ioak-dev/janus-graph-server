@@ -9,6 +9,12 @@ const {
   schemaTableDataCollection,
 } = require("../data/model");
 const { getCollection } = require("../../../../lib/dbutils");
+const {
+  addCreateLog,
+  addEditLog,
+  addDeleteLog,
+} = require("../../../activity/service");
+const { updateChoices } = require("./service");
 
 const typeDefs = gql`
   extend type Query {
@@ -29,6 +35,7 @@ const typeDefs = gql`
     name: String
     datatype: String
     meta: JSON
+    options: JSON
   }
 
   type SchemaTableColumn {
@@ -98,6 +105,7 @@ const resolvers = {
       if (!space || !user) {
         return new AuthenticationError("Not authorized to access this content");
       }
+      await updateChoices(space, args.payload);
       const model = getCollection(
         space,
         schemaTableColumnCollection,
@@ -123,6 +131,16 @@ const resolvers = {
       });
       const deletedIdList = deleteResult.map((item) => item.id);
 
+      if (deletedIdList.length > 0) {
+        await addDeleteLog(
+          space,
+          user,
+          "column",
+          args.payload[0].tableId,
+          deletedIdList
+        );
+      }
+
       // Remove data stored against deleted columns
       const updateObject = {};
       deletedIdList.forEach((item) => (updateObject[`row.${item}`] = 1));
@@ -137,15 +155,30 @@ const resolvers = {
       // Insert or update valid columns list
       for (let payload of args.payload) {
         if (payload.id) {
-          existingData = await model.findById(payload.id);
+          const existingData = await model.findById(payload.id);
           const response = await model.findByIdAndUpdate(payload.id, payload, {
             new: true,
           });
           responses.push(response);
+          await addEditLog(
+            space,
+            user,
+            "column",
+            payload,
+            existingData._doc,
+            response.tableId
+          );
         } else {
           const data = new model(payload);
           const response = await data.save();
           responses.push(response);
+          await addCreateLog(
+            space,
+            user,
+            "column",
+            response.tableId,
+            response.id
+          );
         }
       }
 

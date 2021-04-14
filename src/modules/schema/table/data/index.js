@@ -9,6 +9,7 @@ const {
 const { getCollection } = require("../../../../lib/dbutils");
 const {
   buildFilterCondition,
+  buildQuickFilterCondition,
   buildSortCondition,
   setVariables,
   lookupConditions,
@@ -17,32 +18,40 @@ const {
   schemaTableColumnCollection,
   schemaTableColumnSchema,
 } = require("../column/model");
+const {
+  addCreateLog,
+  addEditLog,
+  addDeleteLog,
+} = require("../../../activity/service");
 
-const { getRecordById } = require("./service");
+const {
+  getRecordByIdOrReference,
+  resolveComputedFields,
+} = require("./service");
+
+const { nextval } = require("../../../sequence/service");
 
 const typeDefs = gql`
   extend type Query {
     schemaTableDataById(tableId: ID!, id: ID!): SchemaTableData
-    allSchemaTableData(tableId: ID!): [SchemaTableData]
+    test(tableId: ID, id: ID): TestData
+    schemaTableDataByReference(tableId: ID!, reference: Int!): SchemaTableData
     searchSchemaTableData(
       pageSize: Int
       pageNo: Int
       tableId: ID!
       anonymousFilter: JSON
+      quickFilter: JSON
       filterId: String
     ): SchemaTableDataPaginated
   }
 
   extend type Mutation {
     addSchemaTableData(payload: SchemaTableDataPayload): SchemaTableData
-    deleteSchemaTableData(idList: [ID!]): SchemaTableDataDeleteResponse
-  }
-
-  type TestSchema {
-    id: ID!
-    tableId: ID!
-    row: JSON
-    reference: JSON
+    deleteSchemaTableData(
+      tableId: ID!
+      idList: [ID!]
+    ): SchemaTableDataDeleteResponse
   }
 
   input SchemaTableColumnFilter {
@@ -70,6 +79,7 @@ const typeDefs = gql`
 
   type SchemaTableData {
     id: ID!
+    reference: Int
     tableId: ID!
     row: JSON
     relation: JSON
@@ -77,6 +87,11 @@ const typeDefs = gql`
 
   type SchemaTableDataDeleteResponse {
     idList: [ID!]
+  }
+
+  type TestData {
+    data: JSON
+    tpl: JSON
   }
 `;
 
@@ -86,53 +101,33 @@ const resolvers = {
       if (!space || !user) {
         return new AuthenticationError("Not authorized to access this content");
       }
-      return await getRecordById(space, tableId, id);
+      return await getRecordByIdOrReference(space, tableId, id, null);
     },
-    allSchemaTableData: async (_, { tableId }, { space, user }) => {
+    test: async (_, { tableId, id }, { space, user }) => {
+      const data = await getRecordByIdOrReference(space, tableId, id, null);
+      const derivedProperty = resolveComputedFields();
+      return { data, tpl: derivedProperty };
+    },
+    schemaTableDataByReference: async (
+      _,
+      { tableId, reference },
+      { space, user }
+    ) => {
       if (!space || !user) {
         return new AuthenticationError("Not authorized to access this content");
       }
-      const model = getCollection(
-        space,
-        schemaTableDataCollection,
-        schemaTableDataSchema
-      );
-      const schemaTableColumnModel = getCollection(
-        space,
-        schemaTableColumnCollection,
-        schemaTableColumnSchema
-      );
-      const schemaTableColumnList = await schemaTableColumnModel.find({
-        tableId,
-      });
-      const queryVariables = setVariables(schemaTableColumnList);
-      const aggregatePipeline = [];
-      aggregatePipeline.push({
-        $match: {
-          tableId,
-        },
-      });
-      if (queryVariables) {
-        aggregatePipeline.push(queryVariables);
-      }
-      aggregatePipeline.push(
-        ...lookupConditions(schemaTableColumnList, schemaTableDataCollection)
-      );
-      aggregatePipeline.push({
-        $set: {
-          id: "$_id",
-          // "reference.id": "$reference._id",
-        },
-      });
-      const response = await model.aggregate(aggregatePipeline);
-      // .sort({ "reference.u.row.60525362eae0b04bc07ab88d": -1 });
-      // console.log("***");
-      // console.log(response);
-      return response;
+      return await getRecordByIdOrReference(space, tableId, null, reference);
     },
     searchSchemaTableData: async (
       _,
-      { pageSize = 10, pageNo = 0, tableId, filterId, anonymousFilter },
+      {
+        pageSize = 10,
+        pageNo = 0,
+        tableId,
+        filterId,
+        anonymousFilter,
+        quickFilter,
+      },
       { space, user }
     ) => {
       if (!space || !user) {
@@ -167,7 +162,10 @@ const resolvers = {
         schemaTableColumnList,
         schemaTableFilterList
       );
-      console.log(filterCondition);
+      const quickFilterCondition = buildQuickFilterCondition(
+        quickFilter,
+        schemaTableColumnList
+      );
       aggregatePipeline.push({
         $match: {
           $and: [
@@ -175,6 +173,7 @@ const resolvers = {
               tableId: tableId,
             },
             filterCondition,
+            quickFilterCondition,
           ],
         },
       });
@@ -208,6 +207,7 @@ const resolvers = {
       if (!space || !user) {
         return new AuthenticationError("Not authorized to access this content");
       }
+      payload = await resolveComputedFields(space, args.payload);
       const model = getCollection(
         space,
         schemaTableDataCollection,
@@ -215,20 +215,41 @@ const resolvers = {
       );
       let response;
 
-      if (args.payload.id) {
-        existingData = await model.findById(args.payload.id);
-        response = await model.findByIdAndUpdate(
-          args.payload.id,
-          args.payload,
-          { new: true }
+      if (payload.id) {
+        existingData = await model.findById(payload.id);
+        response = await model.findByIdAndUpdate(payload.id, payload, {
+          new: true,
+        });
+        await addEditLog(
+          space,
+          user,
+          "record",
+          payload.row,
+          existingData._doc.row,
+          response.tableId,
+          response.id
         );
       } else {
-        const data = new model(args.payload);
+        const data = new model({
+          ...payload,
+          reference: `${await nextval("record_reference", "record", space)}`,
+        });
         response = await data.save();
+        await addCreateLog(
+          space,
+          user,
+          "record",
+          response.tableId,
+          response.id
+        );
       }
-      return await getRecordById(space, response.tableId, response.id);
+      return await getRecordByIdOrReference(
+        space,
+        response.tableId,
+        response.id
+      );
     },
-    deleteSchemaTableData: async (_, { idList }, { space, user }) => {
+    deleteSchemaTableData: async (_, { tableId, idList }, { space, user }) => {
       if (!space || !user) {
         return new AuthenticationError("Not authorized to access this content");
       }
@@ -239,6 +260,7 @@ const resolvers = {
       );
 
       const res = await model.deleteMany({ _id: { $in: idList } });
+      await addDeleteLog(space, user, "record", tableId, idList);
 
       return { idList };
     },

@@ -17,7 +17,9 @@ const schemaSchema = require("./modules/schema");
 const schemaTableSchema = require("./modules/schema/table");
 const schemaTableDataSchema = require("./modules/schema/table/data");
 const schemaTableColumnSchema = require("./modules/schema/table/column");
+const schemaTableColumnChoiceSchema = require("./modules/schema/table/column/choice");
 const schemaTableFilterSchema = require("./modules/schema/table/filter");
+const activitySchema = require("./modules/activity");
 
 const databaseUri = process.env.MONGODB_URI || "mongodb://localhost:27017";
 mongoose.connect(databaseUri, {
@@ -36,8 +38,10 @@ const server = new ApolloServer({
     schemaSchema.typeDefs,
     schemaTableSchema.typeDefs,
     schemaTableColumnSchema.typeDefs,
+    schemaTableColumnChoiceSchema.typeDefs,
     schemaTableDataSchema.typeDefs,
     schemaTableFilterSchema.typeDefs,
+    activitySchema.typeDefs,
   ],
   resolvers: [
     gqlScalarSchema.resolvers,
@@ -46,8 +50,10 @@ const server = new ApolloServer({
     schemaSchema.resolvers,
     schemaTableSchema.resolvers,
     schemaTableColumnSchema.resolvers,
+    schemaTableColumnChoiceSchema.resolvers,
     schemaTableDataSchema.resolvers,
     schemaTableFilterSchema.resolvers,
+    activitySchema.resolvers,
   ],
   context: ({ req, res }: any) => {
     const authString = req.headers.authorization || "";

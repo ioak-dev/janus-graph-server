@@ -1,9 +1,9 @@
-const { sequenceCollection, sequenceSchema } = require('./model');
-const { getGlobalCollection, getCollection } = require('../../lib/dbutils');
+const { sequenceCollection, sequenceSchema } = require("./model");
+const { getGlobalCollection, getCollection } = require("../../lib/dbutils");
 
 export const create_sequence = async (
-  field: String,
-  context: String | null,
+  name: String,
+  context: String | null | undefined,
   factor: Number,
   space?: String
 ) => {
@@ -14,21 +14,21 @@ export const create_sequence = async (
     model = getGlobalCollection(sequenceCollection, sequenceSchema);
   }
 
-  const existing_sequence = await model.findOne({ field, context });
+  const existing_sequence = await model.findOne({ name, context });
 
   if (existing_sequence) {
     return existing_sequence;
   }
 
   return await model.findOneAndUpdate(
-    { field, context },
-    { field, context, factor, nextval: 1 },
+    { name, context },
+    { name, context, factor, nextval: 1 },
     { upsert: true, new: true }
   );
 };
 
 export const nextval = async (
-  field: String,
+  name: String,
   context?: String,
   space?: String
 ) => {
@@ -38,12 +38,13 @@ export const nextval = async (
   } else {
     model = getGlobalCollection(sequenceCollection, sequenceSchema);
   }
-  const sequence = await model.findOne({ field, context });
+  let sequence = await model.findOne({ name, context });
   if (!sequence) {
-    return null;
+    await create_sequence(name, context, 1, space);
+    sequence = await model.findOne({ name, context });
   }
   await model.findOneAndUpdate(
-    { field, context },
+    { name, context },
     { nextval: sequence.nextval + sequence.factor },
     { upsert: true, new: true }
   );

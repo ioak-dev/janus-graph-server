@@ -4,6 +4,7 @@ const Schema = mongoose.Schema;
 const schemaTableDataSchema = new Schema(
   {
     tableId: { type: String },
+    reference: { type: Number },
     row: { type: Object },
   },
   { timestamps: true }

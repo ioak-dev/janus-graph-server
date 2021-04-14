@@ -12,8 +12,8 @@ const typeDefs = gql`
   }
 
   extend type Mutation {
-    addSchemaTable(payload: SchemaTablePayload): SchemaTable
-    deleteSchemaTable(id: ID!): SchemaTable
+    updateSchemaTable(payload: SchemaTablePayload): SchemaTable
+    deleteSchemaTable(idList: [ID!]): SchemaTableDeleteResponse
   }
 
   input SchemaTablePayload {
@@ -34,6 +34,10 @@ const typeDefs = gql`
 
   extend type Schema {
     table: [SchemaTable]
+  }
+
+  type SchemaTableDeleteResponse {
+    idList: [ID!]
   }
 `;
 
@@ -115,7 +119,7 @@ const resolvers = {
   },
 
   Mutation: {
-    addSchemaTable: async (_, args, { space, user }) => {
+    updateSchemaTable: async (_, args, { space, user }) => {
       if (!space || !user) {
         return new AuthenticationError("Not authorized to access this content");
       }
@@ -139,7 +143,7 @@ const resolvers = {
       }
       return schemaTableResponse;
     },
-    deleteSchemaTable: async (_, { id }, { space, user }) => {
+    deleteSchemaTable: async (_, { idList }, { space, user }) => {
       if (!space || !user) {
         return new AuthenticationError("Not authorized to access this content");
       }
@@ -149,9 +153,9 @@ const resolvers = {
         schemaTableSchema
       );
 
-      const res = await model.findByIdAndDelete(id);
+      const res = await model.deleteMany({ _id: { $in: idList } });
 
-      return res;
+      return { idList };
     },
   },
 };

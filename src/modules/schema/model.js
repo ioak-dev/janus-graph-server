@@ -4,6 +4,7 @@ const Schema = mongoose.Schema;
 const schemaSchema = new Schema(
   {
     name: { type: String },
+    description: { type: String },
   },
   { timestamps: true }
 );
