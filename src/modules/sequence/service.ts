@@ -50,3 +50,21 @@ export const nextval = async (
   );
   return sequence.nextval;
 };
+
+export const checkval = async (
+  name: String,
+  context?: String,
+  space?: String
+) => {
+  let model;
+  if (space) {
+    model = getCollection(space, sequenceCollection, sequenceSchema);
+  } else {
+    model = getGlobalCollection(sequenceCollection, sequenceSchema);
+  }
+  let sequence = await model.findOne({ name, context });
+  if (!sequence) {
+    return null;
+  }
+  return sequence.nextval;
+};

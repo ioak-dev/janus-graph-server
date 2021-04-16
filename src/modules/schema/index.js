@@ -2,6 +2,7 @@ const { gql, AuthenticationError } = require("apollo-server-express");
 const { GraphQLScalarType } = require("graphql");
 const { schemaSchema, schemaCollection } = require("./model");
 const { getCollection } = require("../../lib/dbutils");
+const { generateSchemaReference } = require("./service");
 
 const typeDefs = gql`
   scalar DateScalar
@@ -18,12 +19,14 @@ const typeDefs = gql`
 
   input SchemaPayload {
     id: String
+    reference: String
     name: String
     description: String
   }
 
   type Schema {
     id: ID!
+    reference: String
     name: String
     description: String
     createdAt: DateScalar
@@ -110,16 +113,24 @@ const resolvers = {
       }
       const model = getCollection(space, schemaCollection, schemaSchema);
       let schemaResponse;
+      let reference = args.payload.name.substring(0, 4).toUpperCase();
 
       if (args.payload.id) {
+        if (
+          !args.payload.reference ||
+          !args.payload.reference.startsWith(reference)
+        ) {
+          reference = await generateSchemaReference(space, reference);
+        }
         existingSchema = await model.findById(args.payload.id);
         schemaResponse = await model.findByIdAndUpdate(
           args.payload.id,
-          args.payload,
+          { ...args.payload, reference },
           { new: true }
         );
       } else {
-        const data = new model(args.payload);
+        reference = await generateSchemaReference(space, reference);
+        const data = new model({ ...args.payload, reference });
         schemaResponse = await data.save();
       }
       return schemaResponse;

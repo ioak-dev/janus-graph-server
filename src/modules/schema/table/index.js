@@ -2,6 +2,7 @@ const { gql, AuthenticationError } = require("apollo-server-express");
 const { GraphQLScalarType } = require("graphql");
 const { schemaTableSchema, schemaTableCollection } = require("./model");
 const { getCollection } = require("../../../lib/dbutils");
+const { generateTableReference } = require("./service");
 
 const typeDefs = gql`
   extend type Query {
@@ -19,6 +20,7 @@ const typeDefs = gql`
   input SchemaTablePayload {
     id: String
     schemaId: String
+    reference: String
     name: String
     description: String
   }
@@ -26,6 +28,7 @@ const typeDefs = gql`
   type SchemaTable {
     id: ID!
     schemaId: String
+    reference: String
     name: String
     description: String
     createdAt: DateScalar
@@ -129,16 +132,24 @@ const resolvers = {
         schemaTableSchema
       );
       let schemaTableResponse;
+      let reference = args.payload.name.substring(0, 4).toUpperCase();
 
       if (args.payload.id) {
+        if (
+          !args.payload.reference ||
+          !args.payload.reference.startsWith(reference)
+        ) {
+          reference = await generateTableReference(space, reference);
+        }
         existingSchemaTable = await model.findById(args.payload.id);
         schemaTableResponse = await model.findByIdAndUpdate(
           args.payload.id,
-          args.payload,
+          { ...args.payload, reference },
           { new: true }
         );
       } else {
-        const data = new model(args.payload);
+        reference = await generateTableReference(space, reference);
+        const data = new model({ ...args.payload, reference });
         schemaTableResponse = await data.save();
       }
       return schemaTableResponse;

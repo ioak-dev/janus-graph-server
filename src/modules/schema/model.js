@@ -3,6 +3,7 @@ var mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 const schemaSchema = new Schema(
   {
+    reference: { type: String },
     name: { type: String },
     description: { type: String },
   },

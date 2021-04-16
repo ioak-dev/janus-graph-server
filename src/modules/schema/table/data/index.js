@@ -232,7 +232,11 @@ const resolvers = {
       } else {
         const data = new model({
           ...payload,
-          reference: `${await nextval("record_reference", "record", space)}`,
+          reference: `${await nextval(
+            "record_reference",
+            payload.tableId,
+            space
+          )}`,
         });
         response = await data.save();
         await addCreateLog(
