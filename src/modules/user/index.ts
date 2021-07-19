@@ -1,11 +1,13 @@
 import jwt from "jsonwebtoken";
 import { gql, AuthenticationError } from "apollo-server-express";
 import { userSchema, userCollection } from "./model";
+import * as Helper from "./helper";
 const { getCollection } = require("../../lib/dbutils");
 
 const typeDefs = gql`
   type Query {
     user: [User]
+    authorizeUser(accessToken: String, refreshToken: String): AuthorizeResponse
   }
 
   type Mutation {
@@ -20,10 +22,17 @@ const typeDefs = gql`
 
   type User {
     id: ID!
-    firstName: String
-    lastName: String
+    given_name: String
+    family_name: String
+    name: String
+    nickname: String
     email: String
     resolver: String
+  }
+
+  type AuthorizeResponse {
+    accessToken: String
+    claims: JSON
   }
 `;
 
@@ -35,6 +44,49 @@ const resolvers = {
       }
       const model = getCollection(space, userCollection, userSchema);
       return await model.find();
+    },
+    authorizeUser: async (
+      _: any,
+      { accessToken, refreshToken }: any,
+      { space }: any
+    ) => {
+      const model = getCollection(space, userCollection, userSchema);
+      const accessTokenResponse = await Helper.decodeAccessToken(
+        space,
+        accessToken
+      );
+
+      if (accessTokenResponse !== "expired") {
+        return {
+          accessToken: null,
+          claims: accessTokenResponse,
+        };
+      }
+
+      const newAccessToken = await Helper.getNewAccessToken(
+        space,
+        refreshToken
+      );
+
+      if (newAccessToken?.access_token) {
+        const newAccessTokenResponse = await Helper.decodeAccessToken(
+          space,
+          newAccessToken.access_token
+        );
+
+        return {
+          accessToken: newAccessToken.access_token,
+          claims: newAccessTokenResponse,
+        };
+      }
+
+      return null;
+      // const response = await model.findOneAndUpdate(
+      //   { email: args.payload.email, resolver: "email" },
+      //   { ...args.payload, resolver: "email" },
+      //   { upsert: true, new: true, rawResult: true }
+      // );
+      // return response.value;
     },
   },
 
