@@ -76,7 +76,6 @@ const _getComputedField = async (space, columnMap, currentColumn, rowData) => {
       rowData
     );
   }
-  console.log(",,,,,-", currentColumn.meta.template);
   return template(currentColumn.meta.template)(variables);
 };
 
@@ -155,7 +154,6 @@ export const resolveComputedFields = async (space, payload) => {
   for (let i = 0; i < currentTableColumnList.length; i++) {
     const currentColumn = currentTableColumnList[i];
     if (currentColumn.datatype === "computed") {
-      console.log(currentColumn);
       payload.row[currentColumn.id] = await _getComputedField(
         space,
         schemaTableColumnMap,
@@ -164,8 +162,6 @@ export const resolveComputedFields = async (space, payload) => {
       );
     }
   }
-
-  console.log(payload);
 
   return payload;
 };

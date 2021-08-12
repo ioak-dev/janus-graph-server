@@ -122,7 +122,6 @@ export const setVariables = (schemaTableColumnList) => {
       };
     }
   });
-  console.log(variablesMap);
   if (Object.keys(variablesMap).length === 0) {
     return null;
   }

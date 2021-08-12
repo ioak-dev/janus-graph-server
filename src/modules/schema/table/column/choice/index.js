@@ -35,7 +35,6 @@ const resolvers = {
         schemaTableColumnChoiceCollection,
         schemaTableColumnChoiceSchema
       );
-      console.log(await model.find({ columnId: _id, tableId }));
       return await model.find({ columnId: _id, tableId });
     },
   },

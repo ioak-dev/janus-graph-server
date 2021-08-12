@@ -15,7 +15,7 @@ export const addCreateLog = async (
     operation: "ADD",
     parentReference,
     reference,
-    userId: user.userId,
+    userId: user.user_id,
   });
   return;
 };
@@ -38,7 +38,7 @@ export const addEditLog = async (
       parentReference,
       fields: diff,
       reference: reference ? reference : newVal.id,
-      userId: user.userId,
+      userId: user.user_id,
     });
   }
   return;
@@ -57,7 +57,7 @@ export const addDeleteLog = async (
     parentReference,
     reference,
     operation: "DELETE",
-    userId: user.userId,
+    userId: user.user_id,
   });
 };
 
